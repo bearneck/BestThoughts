@@ -3,6 +3,8 @@ package com.grcen.bestthoughts.fragments;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
@@ -13,15 +15,26 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-
+import android.widget.Toast;
 
 import com.grcen.bestthoughts.Bean.Picture;
 import com.grcen.bestthoughts.R;
 import com.grcen.bestthoughts.adapters.PictureAdapter;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
+import okhttp3.FormBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class MainFragment extends Fragment {
 
@@ -29,6 +42,7 @@ public class MainFragment extends Fragment {
     public static final String POSITION = "POSITION";
     private Context mContext;
     private int mPosition;
+
 
     public static MainFragment newInstance(int position) {
         MainFragment fragment = new MainFragment();
@@ -50,6 +64,7 @@ public class MainFragment extends Fragment {
         if (getArguments() != null) {
             mPosition = getArguments().getInt(POSITION);
         }
+
     }
 
     @Nullable
@@ -94,33 +109,90 @@ public class MainFragment extends Fragment {
 
     // 初始化图片界面控件
     private Picture[] pictures = {
-            new Picture("琳琳","老陈好帅",233,666,999,"https://graph.baidu.com/resource/1025ad5cdbcfb098df3b401551352015.jpg","https://ss0.baidu.com/73x1bjeh1BF3odCf/it/u=950331994,3932022251&fm=85&s=7A94E6064F445747064E12740300806C"),
+            new Picture("QQ","好帅",233,666,999,"https://graph.baidu.com/resource/1025ad5cdbcfb098df3b401551352015.jpg","https://ss0.baidu.com/73x1bjeh1BF3odCf/it/u=950331994,3932022251&fm=85&s=7A94E6064F445747064E12740300806C"),
             new Picture("老陈","你也是是真的牛逼",123,126,559,"https://upload.jianshu.io/users/upload_avatars/6560575/d69fb270-103a-4eec-b070-d5e7aa2e9c96.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/96/h/96","https://cdn2.jianshu.io/assets/web/web-note-ad-1-c2e1746859dbf03abe49248893c9bea4.png")
 
     };
     private List<Picture> pictureList = new ArrayList<>();
     private PictureAdapter adapter;
     private SwipeRefreshLayout swipeRefresh;
-
+    private int page = 0;
     @SuppressLint("ResourceAsColor")
     private void initPictureView(View view) {
         initPictures();
+        sendREquestWithOkHttp();
         RecyclerView recyclerView = (RecyclerView) view.findViewById(R.id.recycler_view);
         LinearLayoutManager layoutManager = new LinearLayoutManager(getContext());
         recyclerView.setLayoutManager(layoutManager);
         adapter = new PictureAdapter(pictureList);
         recyclerView.setAdapter(adapter);
-
         swipeRefresh = (SwipeRefreshLayout) view.findViewById(R.id.swipe_refresh);
-        swipeRefresh.setColorSchemeColors(R.color.colorPrimary);//改变刷新颜色
+        swipeRefresh.setColorSchemeColors(R.color.zancolor);//改变刷新颜色
         swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
+                pictureList.clear();//随机调取数据
+                sendREquestWithOkHttp();
                 refreshPictures();
             }
         });
     }
 
+
+    private void sendREquestWithOkHttp() {
+        String pagestr = String.valueOf(page);
+        final RequestBody requestBody = new FormBody.Builder().
+                add("type","3").add("page",pagestr).build();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try{
+                    OkHttpClient client = new OkHttpClient();
+                    Request request = new Request.Builder()
+                            .url("https://www.apiopen.top/satinGodApi")
+                            .post(requestBody)
+                            .build();
+                    Response response = client.newCall(request).execute();
+                    String responseData = response.body().string();
+                    parseJSONWithJsonObject(responseData);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+            }
+
+            public void parseJSONWithJsonObject(String jsonData) {
+                try {
+                    JSONObject jsonObject = new JSONObject(jsonData);
+                    String msg = jsonObject.getString("msg");
+                    int code = jsonObject.getInt("code");
+                    Log.d(TAG, msg+"你好parseJSONWithJsonObject: "+jsonData);
+                    JSONArray data = jsonObject.getJSONArray("data");
+                    Log.d(TAG, msg+"你好parseJSONWithJsonObject: "+data);
+                    for (int i =0;i<data.length();i++){
+                        JSONObject jsonObject1 = data.getJSONObject(i);
+                         String type = jsonObject1.getString("type"); //文章类型
+                         String username = jsonObject1.getString("username");//用户名
+                         String header = jsonObject1.getString("header"); //头像
+                         String text = jsonObject1.getString("text");//内容
+                         String uid = jsonObject1.getString("uid");//文章号
+                         int comment = jsonObject1.getInt("comment");//评论数
+                         int up = jsonObject1.getInt("up");//赞
+                         int forward = jsonObject1.getInt("forward");//分享
+                         String image = jsonObject1.getString("image");//图片链接
+                         String thumbnail = jsonObject1.getString("thumbnail");//略缩图链接
+                         Log.d(TAG, msg+"你好parseJSONWithJsonObject: "+username);
+                         Picture pictures1 = new Picture(username,text,up,comment,forward,header,thumbnail);
+                         pictureList.add(pictures1);
+                    }
+
+//
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
     private void refreshPictures() {
         new Thread(new Runnable() {
             @Override
@@ -134,7 +206,7 @@ public class MainFragment extends Fragment {
                 getActivity().runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        initPictures();
+//                        initPictures();
                         adapter.notifyDataSetChanged();
                         swipeRefresh.setRefreshing(false);
                     }
@@ -144,8 +216,10 @@ public class MainFragment extends Fragment {
     }
 
     private void initPictures() {
+        Log.d(TAG, "initPictures: 准备删除");
         pictureList.clear();//随机调取数据
-        for (int i =0;i<20;i++){
+        Log.d(TAG, "initPictures: 完成删除");
+        for (int i =0;i<3;i++){
             Random random = new Random();
             int index = random.nextInt(pictures.length);
             pictureList.add(pictures[index]);
